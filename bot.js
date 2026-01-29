@@ -86,6 +86,22 @@ const commands = [
                 .setDescription('Button 3 emoji')
                 .setRequired(false))
         .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
+    new SlashCommandBuilder()
+        .setName('admin-say')
+        .setDescription('Send a custom message or reply with an optional file!')
+        .addStringOption(option =>
+            option.setName('text')
+                .setDescription('Message text to send')
+                .setRequired(true))
+        .addAttachmentOption(option =>
+            option.setName('attachment')
+                .setDescription('Optional file to send')
+                .setRequired(false))
+        .addStringOption(option =>
+            option.setName('reply-to')
+                .setDescription('Message ID to reply to (optional)')
+                .setRequired(false))
+        .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
 ].map(command => command.toJSON());
 
 const rest = new REST({ version: '10' }).setToken(TOKEN);
@@ -424,11 +440,43 @@ client.on('interactionCreate', async (interaction) => {
                 console.error('Error sending embed:', error);
                 await interaction.reply({ content: '❌ Error saat mengirim embed!', ephemeral: true });
             }
+        if (commandName === 'admin-say') {
+            try {
+                const text = interaction.options.getString('text');
+                const attachment = interaction.options.getAttachment('attachment');
+                const replyToId = interaction.options.getString('reply-to');
+
+                const messageOptions = {
+                    content: text
+                };
+
+                if (attachment) {
+                    messageOptions.files = [attachment.url];
+                }
+
+                let sentMessage;
+                if (replyToId) {
+                    try {
+                        const messageToReply = await interaction.channel.messages.fetch(replyToId);
+                        sentMessage = await messageToReply.reply(messageOptions);
+                    } catch (error) {
+                        console.error('Error fetching message to reply:', error);
+                        return await interaction.reply({ 
+                            content: '❌ Message ID tidak ditemukan atau sudah dihapus!', 
+                            ephemeral: true 
+                        });
+                    }
+                } else {
+                    sentMessage = await interaction.channel.send(messageOptions);
+                }
+
+                await interaction.reply({ content: '✅ Message berhasil dikirim!', ephemeral: true });
+            } catch (error) {
+                console.error('Error sending message:', error);
+                await interaction.reply({ content: '❌ Error saat mengirim message!', ephemeral: true });
+            }
         }
     }
-
-    // Handle string select menus
-    if (interaction.isStringSelectMenu()) {
         try {
             const selectedValues = interaction.values;
         const member = interaction.member;
