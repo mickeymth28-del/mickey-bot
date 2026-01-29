@@ -42,16 +42,48 @@ const commands = [
                 .setDescription('Image URL')
                 .setRequired(false))
         .addStringOption(option =>
-            option.setName('button1')
-                .setDescription('Button 1 (format: name|url|emoji)')
+            option.setName('thumbnail')
+                .setDescription('Thumbnail URL')
                 .setRequired(false))
         .addStringOption(option =>
-            option.setName('button2')
-                .setDescription('Button 2 (format: name|url|emoji)')
+            option.setName('footer')
+                .setDescription('Footer text')
                 .setRequired(false))
         .addStringOption(option =>
-            option.setName('button3')
-                .setDescription('Button 3 (format: name|url|emoji)')
+            option.setName('button1_name')
+                .setDescription('Button 1 name')
+                .setRequired(false))
+        .addStringOption(option =>
+            option.setName('button1_url')
+                .setDescription('Button 1 URL')
+                .setRequired(false))
+        .addStringOption(option =>
+            option.setName('button1_emoji')
+                .setDescription('Button 1 emoji')
+                .setRequired(false))
+        .addStringOption(option =>
+            option.setName('button2_name')
+                .setDescription('Button 2 name')
+                .setRequired(false))
+        .addStringOption(option =>
+            option.setName('button2_url')
+                .setDescription('Button 2 URL')
+                .setRequired(false))
+        .addStringOption(option =>
+            option.setName('button2_emoji')
+                .setDescription('Button 2 emoji')
+                .setRequired(false))
+        .addStringOption(option =>
+            option.setName('button3_name')
+                .setDescription('Button 3 name')
+                .setRequired(false))
+        .addStringOption(option =>
+            option.setName('button3_url')
+                .setDescription('Button 3 URL')
+                .setRequired(false))
+        .addStringOption(option =>
+            option.setName('button3_emoji')
+                .setDescription('Button 3 emoji')
                 .setRequired(false))
         .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
 ].map(command => command.toJSON());
@@ -317,37 +349,60 @@ client.on('interactionCreate', async (interaction) => {
                 const description = interaction.options.getString('description');
                 const color = interaction.options.getString('color') || '#808080';
                 const imageUrl = interaction.options.getString('image');
-                const button1 = interaction.options.getString('button1');
-                const button2 = interaction.options.getString('button2');
-                const button3 = interaction.options.getString('button3');
+                const thumbnailUrl = interaction.options.getString('thumbnail');
+                const footerText = interaction.options.getString('footer');
+                
+                // Get button inputs
+                const button1Name = interaction.options.getString('button1_name');
+                const button1Url = interaction.options.getString('button1_url');
+                const button1Emoji = interaction.options.getString('button1_emoji');
+                
+                const button2Name = interaction.options.getString('button2_name');
+                const button2Url = interaction.options.getString('button2_url');
+                const button2Emoji = interaction.options.getString('button2_emoji');
+                
+                const button3Name = interaction.options.getString('button3_name');
+                const button3Url = interaction.options.getString('button3_url');
+                const button3Emoji = interaction.options.getString('button3_emoji');
 
                 // Create embed
                 const embed = new EmbedBuilder()
                     .setTitle(title)
                     .setDescription(description)
                     .setColor(color)
-                    .setFooter({ text: 'Mickey Mouse Trap House' })
                     .setTimestamp();
+
+                if (footerText) {
+                    embed.setFooter({ text: footerText });
+                } else {
+                    embed.setFooter({ text: 'Mickey Mouse Trap House' });
+                }
 
                 if (imageUrl) {
                     embed.setImage(imageUrl);
                 }
 
-                // Parse buttons
-                const buttonRow = new ActionRowBuilder();
-                const buttons = [button1, button2, button3].filter(b => b);
+                if (thumbnailUrl) {
+                    embed.setThumbnail(thumbnailUrl);
+                }
 
-                for (const buttonString of buttons) {
-                    const [btnName, btnUrl, btnEmoji] = buttonString.split('|').map(s => s.trim());
-                    
-                    if (btnName && btnUrl) {
+                // Build buttons
+                const buttonRow = new ActionRowBuilder();
+                const buttonList = [
+                    { name: button1Name, url: button1Url, emoji: button1Emoji },
+                    { name: button2Name, url: button2Url, emoji: button2Emoji },
+                    { name: button3Name, url: button3Url, emoji: button3Emoji }
+                ];
+
+                for (const btn of buttonList) {
+                    if (btn.name && btn.url) {
                         const button = new ButtonBuilder()
-                            .setLabel(btnName)
-                            .setURL(btnUrl)
+                            .setLabel(btn.name)
+                            .setURL(btn.url)
                             .setStyle(ButtonStyle.Link);
 
-                        if (btnEmoji) {
-                            button.setEmoji(btnEmoji);
+                        if (btn.emoji) {
+                            button.setEmoji(btn.emoji);
                         }
 
                         buttonRow.addComponents(button);
