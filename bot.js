@@ -440,6 +440,8 @@ client.on('interactionCreate', async (interaction) => {
                 console.error('Error sending embed:', error);
                 await interaction.reply({ content: '❌ Error saat mengirim embed!', ephemeral: true });
             }
+        }
+
         if (commandName === 'admin-say') {
             try {
                 const text = interaction.options.getString('text');
@@ -617,24 +619,25 @@ client.on('interactionCreate', async (interaction) => {
         setTimeout(() => {
             msg.delete().catch(() => {});
         }, 3000);
-            } catch (error) {
-        console.error('Error handling role selection:', error);
-        
-        const errorEmbed = new EmbedBuilder()
-            .setColor('#FF0000')
-            .setTitle('❌ Error')
-            .setDescription(`Error: ${error.message}\n\nPastikan:\n1. Bot punya "Manage Roles" permission\n2. Role names cocok dengan setting`)
-            .setTimestamp();
-        
-        const msg = await interaction.reply({ 
-            embeds: [errorEmbed], 
-            ephemeral: true 
-        });
+    } catch (error) {
+            console.error('Error handling role selection:', error);
+            
+            const errorEmbed = new EmbedBuilder()
+                .setColor('#FF0000')
+                .setTitle('❌ Error')
+                .setDescription(`Error: ${error.message}\n\nPastikan:\n1. Bot punya "Manage Roles" permission\n2. Role names cocok dengan setting`)
+                .setTimestamp();
+            
+            const msg = await interaction.reply({ 
+                embeds: [errorEmbed], 
+                ephemeral: true 
+            });
 
-        // Auto-delete message setelah 3 detik
-        setTimeout(() => {
-            msg.delete().catch(() => {});
-        }, 3000);
+            // Auto-delete message setelah 3 detik
+            setTimeout(() => {
+                msg.delete().catch(() => {});
+            }, 3000);
+        }
     }
 });
 
