@@ -473,7 +473,10 @@ client.on('interactionCreate', async (interaction) => {
                 await interaction.reply({ content: '✅ Message berhasil dikirim!', ephemeral: true });
             } catch (error) {
                 console.error('Error sending message:', error);
-                await interaction.reply({ content: '❌ Error saat mengirim message!', ephemeral: true });
+                await interaction.reply({ 
+                    content: `❌ Error: ${error.message}`, 
+                    ephemeral: true 
+                });
             }
         }
     }
