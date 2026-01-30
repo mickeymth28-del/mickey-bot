@@ -102,6 +102,18 @@ const commands = [
                 .setDescription('Message ID to reply to (optional)')
                 .setRequired(false))
         .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
+    new SlashCommandBuilder()
+        .setName('ban')
+        .setDescription('Ban a user from the server (Admin only)')
+        .addUserOption(option =>
+            option.setName('user')
+                .setDescription('User to ban')
+                .setRequired(true))
+        .addStringOption(option =>
+            option.setName('reason')
+                .setDescription('Reason for the ban')
+                .setRequired(false))
+        .setDefaultMemberPermissions(PermissionFlagsBits.BanMembers),
 ].map(command => command.toJSON());
 
 const rest = new REST({ version: '10' }).setToken(TOKEN);
@@ -122,7 +134,22 @@ const rest = new REST({ version: '10' }).setToken(TOKEN);
 client.once('ready', () => {
     console.log(`✅ ${client.user.tag} udah online!`);
     console.log(`🏠 Di ${client.guilds.cache.size} server`);
-    client.user.setActivity('/setuproles | /admin-embed', { type: 'WATCHING' });
+    
+    // Set rotating presence
+    const activities = [
+        { name: '/setuproles', type: 'WATCHING' },
+        { name: 'role selection', type: 'WATCHING' },
+        { name: '/admin-embed', type: 'WATCHING' },
+        { name: 'members', type: 'WATCHING' }
+    ];
+    
+    let activityIndex = 0;
+    client.user.setActivity(activities[activityIndex].name, { type: activities[activityIndex].type });
+    
+    setInterval(() => {
+        activityIndex = (activityIndex + 1) % activities.length;
+        client.user.setActivity(activities[activityIndex].name, { type: activities[activityIndex].type });
+    }, 15000); // Berubah setiap 15 detik
 });
 
 // Handle interactions (slash commands & components)
@@ -478,6 +505,44 @@ client.on('interactionCreate', async (interaction) => {
                 await interaction.reply({ 
                     content: `❌ Error: ${error.message}`, 
                     ephemeral: true 
+                });
+            }
+        }
+
+        if (commandName === 'ban') {
+            try {
+                const user = interaction.options.getUser('user');
+                const reason = interaction.options.getString('reason') || 'No reason provided';
+                const member = interaction.guild.members.cache.get(user.id);
+
+                // Check if user is bannable
+                if (member && !member.bannable) {
+                    return await interaction.reply({
+                        content: '❌ Cannot ban this user! (Role hierarchy issue)',
+                        ephemeral: true
+                    });
+                }
+
+                // Ban the user
+                await interaction.guild.bans.create(user.id, { reason: reason });
+
+                const banEmbed = new EmbedBuilder()
+                    .setColor('#FF0000')
+                    .setTitle('⛔ User Banned')
+                    .addFields(
+                        { name: 'User', value: `${user.tag} (${user.id})`, inline: true },
+                        { name: 'Reason', value: reason, inline: true },
+                        { name: 'Banned by', value: interaction.user.tag, inline: true }
+                    )
+                    .setThumbnail(user.displayAvatarURL())
+                    .setTimestamp();
+
+                await interaction.reply({ embeds: [banEmbed], ephemeral: true });
+            } catch (error) {
+                console.error('Error banning user:', error);
+                await interaction.reply({
+                    content: `❌ Error: ${error.message}`,
+                    ephemeral: true
                 });
             }
         }
