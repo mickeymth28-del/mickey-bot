@@ -1,4 +1,4 @@
-const { Client, GatewayIntentBits, EmbedBuilder, ActionRowBuilder, StringSelectMenuBuilder, StringSelectMenuOptionBuilder, PermissionFlagsBits, ButtonBuilder, ButtonStyle, REST, Routes, SlashCommandBuilder } = require('discord.js');
+const { Client, GatewayIntentBits, EmbedBuilder, ActionRowBuilder, StringSelectMenuBuilder, StringSelectMenuOptionBuilder, PermissionFlagsBits, ButtonBuilder, ButtonStyle, REST, Routes, SlashCommandBuilder, ModalBuilder, TextInputBuilder, TextInputStyle } = require('discord.js');
 
 const client = new Client({ 
     intents: [
@@ -138,6 +138,10 @@ const commands = [
                 .setDescription('Reason for the unban')
                 .setRequired(false))
         .setDefaultMemberPermissions(PermissionFlagsBits.BanMembers),
+    new SlashCommandBuilder()
+        .setName('embed-create')
+        .setDescription('Create a custom embed with a modal (Admin only)')
+        .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
 ].map(command => command.toJSON());
 
 const rest = new REST({ version: '10' }).setToken(TOKEN);
@@ -648,6 +652,205 @@ client.on('interactionCreate', async (interaction) => {
                 await interaction.reply({ embeds: [unbanEmbed], ephemeral: true });
             } catch (error) {
                 console.error('Error unbanning user:', error);
+                await interaction.reply({
+                    content: `❌ Error: ${error.message}`,
+                    ephemeral: true
+                });
+            }
+        }
+
+        if (commandName === 'embed-create') {
+            try {
+                // Create modal dengan text inputs
+                const modal = new ModalBuilder()
+                    .setCustomId('embed_create_modal')
+                    .setTitle('Create Embed');
+
+                // Title input
+                const titleInput = new TextInputBuilder()
+                    .setCustomId('embed_title')
+                    .setLabel('Title')
+                    .setStyle(TextInputStyle.Short)
+                    .setPlaceholder('Enter embed title')
+                    .setRequired(false);
+
+                // Description input
+                const descriptionInput = new TextInputBuilder()
+                    .setCustomId('embed_description')
+                    .setLabel('Description')
+                    .setStyle(TextInputStyle.Paragraph)
+                    .setPlaceholder('Enter embed description')
+                    .setRequired(false);
+
+                // Color input
+                const colorInput = new TextInputBuilder()
+                    .setCustomId('embed_color')
+                    .setLabel('Color (hex, e.g., #FF0000)')
+                    .setStyle(TextInputStyle.Short)
+                    .setPlaceholder('#808080')
+                    .setRequired(false);
+
+                // Image URL input
+                const imageInput = new TextInputBuilder()
+                    .setCustomId('embed_image')
+                    .setLabel('Image URL')
+                    .setStyle(TextInputStyle.Short)
+                    .setPlaceholder('https://...')
+                    .setRequired(false);
+
+                // Thumbnail URL input
+                const thumbnailInput = new TextInputBuilder()
+                    .setCustomId('embed_thumbnail')
+                    .setLabel('Thumbnail URL')
+                    .setStyle(TextInputStyle.Short)
+                    .setPlaceholder('https://...')
+                    .setRequired(false);
+
+                // Footer input
+                const footerInput = new TextInputBuilder()
+                    .setCustomId('embed_footer')
+                    .setLabel('Footer Text')
+                    .setStyle(TextInputStyle.Short)
+                    .setPlaceholder('Footer text here')
+                    .setRequired(false);
+
+                // Add rows to modal
+                const row1 = new ActionRowBuilder().addComponents(titleInput);
+                const row2 = new ActionRowBuilder().addComponents(descriptionInput);
+                const row3 = new ActionRowBuilder().addComponents(colorInput);
+                const row4 = new ActionRowBuilder().addComponents(imageInput);
+                const row5 = new ActionRowBuilder().addComponents(thumbnailInput);
+
+                modal.addComponents(row1, row2, row3, row4, row5);
+
+                await interaction.showModal(modal);
+            } catch (error) {
+                console.error('Error showing embed modal:', error);
+                await interaction.reply({
+                    content: `❌ Error: ${error.message}`,
+                    ephemeral: true
+                });
+            }
+        }
+    }
+
+    // Handle modal submissions
+    if (interaction.isModalSubmit()) {
+        if (interaction.customId === 'embed_create_modal') {
+            try {
+                // Get values from modal
+                const title = interaction.fields.getTextInputValue('embed_title');
+                const description = interaction.fields.getTextInputValue('embed_description');
+                const color = interaction.fields.getTextInputValue('embed_color') || '#808080';
+                const imageUrl = interaction.fields.getTextInputValue('embed_image');
+                const thumbnailUrl = interaction.fields.getTextInputValue('embed_thumbnail');
+                const footerText = interaction.fields.getTextInputValue('embed_footer');
+
+                // Create the embed
+                const embed = new EmbedBuilder()
+                    .setTimestamp();
+
+                if (title) embed.setTitle(title);
+                if (description) embed.setDescription(description);
+                if (color) {
+                    try {
+                        embed.setColor(color);
+                    } catch (e) {
+                        embed.setColor('#808080'); // Default jika color invalid
+                    }
+                }
+                if (imageUrl) embed.setImage(imageUrl);
+                if (thumbnailUrl) embed.setThumbnail(thumbnailUrl);
+                if (footerText) {
+                    embed.setFooter({ text: footerText });
+                } else {
+                    embed.setFooter({ text: 'Mickey Mouse Trap House' });
+                }
+
+                // Create preview with buttons
+                const sendButton = new ButtonBuilder()
+                    .setCustomId('embed_send')
+                    .setLabel('Send')
+                    .setStyle(ButtonStyle.Success);
+
+                const cancelButton = new ButtonBuilder()
+                    .setCustomId('embed_cancel')
+                    .setLabel('Cancel')
+                    .setStyle(ButtonStyle.Danger);
+
+                const buttonRow = new ActionRowBuilder().addComponents(sendButton, cancelButton);
+
+                // Store embed data temporarily (bisa juga pake Map kalau banyak user)
+                const embeds = client.embeds || new Map();
+                embeds.set(interaction.user.id, {
+                    embed: embed,
+                    userId: interaction.user.id,
+                    createdAt: Date.now()
+                });
+                client.embeds = embeds;
+
+                await interaction.reply({
+                    content: '📋 Preview:',
+                    embeds: [embed],
+                    components: [buttonRow],
+                    ephemeral: true
+                });
+            } catch (error) {
+                console.error('Error processing embed modal:', error);
+                await interaction.reply({
+                    content: `❌ Error: ${error.message}`,
+                    ephemeral: true
+                });
+            }
+        }
+    }
+
+    // Handle buttons for embed preview
+    if (interaction.isButton()) {
+        if (interaction.customId === 'embed_send') {
+            try {
+                const embeds = client.embeds || new Map();
+                const embedData = embeds.get(interaction.user.id);
+
+                if (!embedData) {
+                    return await interaction.reply({
+                        content: '❌ Embed data expired! Please create a new embed.',
+                        ephemeral: true
+                    });
+                }
+
+                // Send embed to channel
+                await interaction.channel.send({ embeds: [embedData.embed] });
+
+                // Clean up
+                embeds.delete(interaction.user.id);
+                client.embeds = embeds;
+
+                await interaction.reply({
+                    content: '✅ Embed sent successfully!',
+                    ephemeral: true
+                });
+            } catch (error) {
+                console.error('Error sending embed:', error);
+                await interaction.reply({
+                    content: `❌ Error: ${error.message}`,
+                    ephemeral: true
+                });
+            }
+        }
+
+        if (interaction.customId === 'embed_cancel') {
+            try {
+                const embeds = client.embeds || new Map();
+                embeds.delete(interaction.user.id);
+                client.embeds = embeds;
+
+                await interaction.reply({
+                    content: '❌ Embed creation cancelled.',
+                    ephemeral: true
+                });
+            } catch (error) {
+                console.error('Error cancelling embed:', error);
                 await interaction.reply({
                     content: `❌ Error: ${error.message}`,
                     ephemeral: true
