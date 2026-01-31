@@ -85,7 +85,7 @@ const commands = [
             option.setName('button3_emoji')
                 .setDescription('Button 3 emoji')
                 .setRequired(false))
-        .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
+        .setDefaultMemberPermissions(PermissionFlagsBits.Administrator | PermissionFlagsBits.ManageMessages),
     new SlashCommandBuilder()
         .setName('admin-say')
         .setDescription('Send a custom message or reply with an optional file!')
