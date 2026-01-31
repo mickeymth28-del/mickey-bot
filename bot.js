@@ -174,6 +174,22 @@ const commands = [
                 .setDescription('The sentence to remove')
                 .setRequired(true))
         .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
+    new SlashCommandBuilder()
+        .setName('setup-booster-channel')
+        .setDescription('Setup channel for boost thank-you messages (Admin only)')
+        .addChannelOption(option =>
+            option.setName('channel')
+                .setDescription('Channel to send boost messages')
+                .setRequired(true))
+        .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
+    new SlashCommandBuilder()
+        .setName('setup-booster-role')
+        .setDescription('Setup booster role (Admin only)')
+        .addRoleOption(option =>
+            option.setName('role')
+                .setDescription('Role to give to boosters')
+                .setRequired(true))
+        .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
 ].map(command => command.toJSON());
 
 const rest = new REST({ version: '10' }).setToken(TOKEN);
@@ -233,7 +249,7 @@ client.on('interactionCreate', async (interaction) => {
 😜 | **Mpruyy**
 😆 | **Chalant**
 🧐 | **Otaku**
-🗣️ | **Yapper**   
+🗣️ | **Yapper**     
 🤩 | **Kalcer**  
 🤓 | **Suki**
 💿 | **Performative**
@@ -885,6 +901,78 @@ client.on('interactionCreate', async (interaction) => {
                 });
             }
         }
+
+        if (commandName === 'setup-booster-channel') {
+            try {
+                const channel = interaction.options.getChannel('channel');
+
+                // Initialize config jika belum ada
+                if (!client.boosterConfig) {
+                    client.boosterConfig = {};
+                }
+
+                // Set booster channel untuk guild ini
+                client.boosterConfig[interaction.guildId] = {
+                    ...client.boosterConfig[interaction.guildId],
+                    channelId: channel.id
+                };
+
+                const setupEmbed = new EmbedBuilder()
+                    .setColor('#00FF00')
+                    .setTitle('✅ Booster Channel Setup')
+                    .addFields({
+                        name: 'Channel',
+                        value: `${channel}`,
+                        inline: false
+                    })
+                    .setDescription('Bot akan kirim thank-you message di channel ini saat member boost')
+                    .setTimestamp();
+
+                await interaction.reply({ embeds: [setupEmbed], flags: 64 });
+            } catch (error) {
+                console.error('Error setting up booster channel:', error);
+                await interaction.reply({
+                    content: `❌ Error: ${error.message}`,
+                    flags: 64
+                });
+            }
+        }
+
+        if (commandName === 'setup-booster-role') {
+            try {
+                const role = interaction.options.getRole('role');
+
+                // Initialize config jika belum ada
+                if (!client.boosterConfig) {
+                    client.boosterConfig = {};
+                }
+
+                // Set booster role untuk guild ini
+                client.boosterConfig[interaction.guildId] = {
+                    ...client.boosterConfig[interaction.guildId],
+                    roleId: role.id
+                };
+
+                const setupEmbed = new EmbedBuilder()
+                    .setColor('#00FF00')
+                    .setTitle('✅ Booster Role Setup')
+                    .addFields({
+                        name: 'Role',
+                        value: `${role}`,
+                        inline: false
+                    })
+                    .setDescription('Role ini akan di-assign otomatis ke member yang boost server')
+                    .setTimestamp();
+
+                await interaction.reply({ embeds: [setupEmbed], flags: 64 });
+            } catch (error) {
+                console.error('Error setting up booster role:', error);
+                await interaction.reply({
+                    content: `❌ Error: ${error.message}`,
+                    flags: 64
+                });
+            }
+        }
     }
 
     // Handle modal submissions
@@ -1176,6 +1264,7 @@ client.on('interactionCreate', async (interaction) => {
 });
 
 // Handle autoresponses
+
 client.on('messageCreate', async (message) => {
     // Ignore bot messages
     if (message.author.bot) return;
@@ -1207,6 +1296,46 @@ client.on('messageCreate', async (message) => {
         }
     } catch (error) {
         console.error('Error handling autoresponse:', error);
+    }
+});
+
+// Handle guild member update (detect boost)
+client.on('guildMemberUpdate', async (oldMember, newMember) => {
+    try {
+        // Check jika member baru boost server
+        const wasNotBoosting = !oldMember.premiumSinceTimestamp;
+        const isNowBoosting = newMember.premiumSinceTimestamp;
+
+        if (wasNotBoosting && isNowBoosting) {
+            // Member just boosted!
+            const config = client.boosterConfig?.[newMember.guild.id];
+
+            if (config?.channelId) {
+                // Send thank-you message
+                const channel = newMember.guild.channels.cache.get(config.channelId);
+                if (channel) {
+                    const boostEmbed = new EmbedBuilder()
+                        .setColor('#FF00FF')
+                        .setTitle('🎉 Terima Kasih atas Boostnya!')
+                        .setDescription(`${newMember} baru aja **boost server** kami!\n\nTerima kasih sudah support server ini! 💜`)
+                        .setThumbnail(newMember.user.displayAvatarURL())
+                        .setTimestamp()
+                        .setFooter({ text: 'Mickey Mouse Trap House Boosters' });
+
+                    await channel.send({ embeds: [boostEmbed] }).catch(() => {});
+                }
+            }
+
+            if (config?.roleId) {
+                // Assign booster role
+                const role = newMember.guild.roles.cache.get(config.roleId);
+                if (role && !newMember.roles.cache.has(role.id)) {
+                    await newMember.roles.add(role).catch(() => {});
+                }
+            }
+        }
+    } catch (error) {
+        console.error('Error handling boost detection:', error);
     }
 });
 
