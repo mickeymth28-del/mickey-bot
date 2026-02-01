@@ -2053,20 +2053,27 @@ client.on('messageCreate', async (message) => {
             const INTERNATIONAL_CHAT_CHANNEL_ID = '1451535027820036127';
             
             if (message.channelId === INTERNATIONAL_CHAT_CHANNEL_ID && !message.author.bot) {
+                console.log(`[AUTO-TRANSLATE] Detected message in international-class: "${message.content.substring(0, 50)}..."`);
+                
                 const messageText = message.content;
                 
                 if (messageText.trim().length === 0) return;
 
                 try {
+                    console.log('[AUTO-TRANSLATE] Starting translation...');
                     // Translate text to English (auto-detect source language)
                     const result = await translate(messageText, { to: 'en' });
                     const translatedText = result.text;
                     
+                    console.log('[AUTO-TRANSLATE] Translation result:', { translatedText, from: result.from });
+                    
                     // Safe extraction of detected language
                     const detectedLanguage = result?.from?.language?.iso || result?.from?.language || 'unknown';
+                    console.log('[AUTO-TRANSLATE] Detected language:', detectedLanguage);
 
                     // Jika sudah English atau language unknown, skip
                     if (detectedLanguage === 'en' || detectedLanguage === 'unknown') {
+                        console.log('[AUTO-TRANSLATE] Language is English or unknown, skipping translation');
                         return;
                     }
 
@@ -2092,13 +2099,16 @@ client.on('messageCreate', async (message) => {
                         .setFooter({ text: `Requested by ${message.author.username}` })
                         .setTimestamp();
 
+                    console.log('[AUTO-TRANSLATE] Sending translation embed...');
                     await message.reply({ 
                         embeds: [translateEmbed],
                         allowedMentions: { repliedUser: false }
-                    }).catch(() => {});
+                    }).catch((err) => {
+                        console.error('[AUTO-TRANSLATE] Error sending reply:', err);
+                    });
 
                 } catch (translateError) {
-                    console.error('Error translating message:', translateError);
+                    console.error('[AUTO-TRANSLATE] Error translating message:', translateError);
                     // Silently fail jangan spam error
                 }
             }
