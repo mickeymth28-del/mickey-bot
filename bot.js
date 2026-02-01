@@ -1,6 +1,7 @@
 const { Client, GatewayIntentBits, EmbedBuilder, ActionRowBuilder, StringSelectMenuBuilder, StringSelectMenuOptionBuilder, PermissionFlagsBits, ButtonBuilder, ButtonStyle, REST, Routes, SlashCommandBuilder, ModalBuilder, TextInputBuilder, TextInputStyle, ChannelType } = require('discord.js');
 const { joinVoiceChannel } = require('@discordjs/voice');
 const axios = require('axios');
+const translate = require('translate-google-api');
 require('dotenv').config();
 
 const client = new Client({ 
@@ -2045,6 +2046,62 @@ client.on('messageCreate', async (message) => {
             }
 
             return;
+        }
+
+        // Handle auto-translate in international-chat channel
+        try {
+            const INTERNATIONAL_CHAT_CHANNEL = 'international-chat';
+            
+            if (message.channel.name === INTERNATIONAL_CHAT_CHANNEL && !message.author.bot) {
+                const messageText = message.content;
+                
+                if (messageText.trim().length === 0) return;
+
+                try {
+                    // Translate text to English (auto-detect source language)
+                    // Format: translate(text, null, 'en') -> null = auto-detect, 'en' = target language
+                    const result = await translate(messageText, null, 'en');
+                    const translatedText = result[0];
+                    const detectedLanguage = result[2].lang?.language || 'unknown';
+
+                    // Jika bukan English, reply dengan translation
+                    if (detectedLanguage !== 'en') {
+                        // Format: Original + Translation
+                        const translateEmbed = new EmbedBuilder()
+                            .setColor('#00D9FF')
+                            .setAuthor({ 
+                                name: `Translation (${detectedLanguage.toUpperCase()} → EN)`,
+                                iconURL: message.author.displayAvatarURL() 
+                            })
+                            .addFields(
+                                { 
+                                    name: '📝 Original', 
+                                    value: `\`\`\`\n${messageText}\n\`\`\``, 
+                                    inline: false 
+                                },
+                                { 
+                                    name: '🌐 English', 
+                                    value: `\`\`\`\n${translatedText}\n\`\`\``, 
+                                    inline: false 
+                                }
+                            )
+                            .setFooter({ text: `Requested by ${message.author.username}` })
+                            .setTimestamp();
+
+                        await message.reply({ 
+                            embeds: [translateEmbed],
+                            allowedMentions: { repliedUser: false }
+                        }).catch(() => {});
+                    }
+                    // Jika sudah English, ignore (tidak reply)
+
+                } catch (translateError) {
+                    console.error('Error translating message:', translateError);
+                    // Silently fail jangan spam error
+                }
+            }
+        } catch (error) {
+            console.error('Error in auto-translate logic:', error);
         }
 
         // Handle autoresponses
