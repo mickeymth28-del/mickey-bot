@@ -1385,15 +1385,30 @@ client.on('messageCreate', async (message) => {
                         reason: `Role dibuat oleh ${message.author.tag}`
                     });
 
-                    const gradientColors = [roleColor1, roleColor2];
+                    // Store gradient info untuk future reference (bisa update manual di Discord)
+                    const gradientInfo = {
+                        roleId: newRole.id,
+                        color1: roleColor1,
+                        color2: roleColor2,
+                        createdBy: message.author.tag,
+                        createdAt: new Date()
+                    };
+
+                    // Store di client untuk reference
+                    if (!client.roleGradients) {
+                        client.roleGradients = new Map();
+                    }
+                    client.roleGradients.set(newRole.id, gradientInfo);
+
                     const createEmbed = new EmbedBuilder()
                         .setColor(roleColor1)
                         .setTitle('✅ Role Berhasil Dibuat')
-                        .setDescription(`Role **${newRole.name}** telah berhasil dibuat dengan gradient!`)
+                        .setDescription(`Role **${newRole.name}** telah dibuat!\n\n⚠️ **Untuk apply Gradient Style:**\nGo to Server Settings → Roles → ${newRole.name} → Change Syle to "Gradient"`)
                         .addFields(
                             { name: 'Role ID', value: newRole.id, inline: true },
-                            { name: 'Gradient', value: `${roleColor1} → ${roleColor2}`, inline: true },
-                            { name: 'Created By', value: message.author.tag, inline: true }
+                            { name: 'Color 1', value: roleColor1, inline: true },
+                            { name: 'Color 2', value: roleColor2, inline: true },
+                            { name: 'Preview Gradient', value: `${roleColor1} ➜ ${roleColor2}`, inline: false }
                         )
                         .setTimestamp();
 
