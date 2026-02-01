@@ -1,5 +1,7 @@
 const { Client, GatewayIntentBits, EmbedBuilder, ActionRowBuilder, StringSelectMenuBuilder, StringSelectMenuOptionBuilder, PermissionFlagsBits, ButtonBuilder, ButtonStyle, REST, Routes, SlashCommandBuilder, ModalBuilder, TextInputBuilder, TextInputStyle, ChannelType } = require('discord.js');
 const { joinVoiceChannel } = require('@discordjs/voice');
+const axios = require('axios');
+require('dotenv').config();
 
 const client = new Client({ 
     intents: [
@@ -1858,6 +1860,142 @@ client.on('messageCreate', async (message) => {
                 }
             }
 
+            // ma.removebg - Remove background from image
+            else if (command === 'removebg') {
+                try {
+                    const REMOVE_BG_API_KEY = process.env.REMOVE_BG_API_KEY;
+                    
+                    if (!REMOVE_BG_API_KEY) {
+                        return message.reply({ 
+                            content: '❌ Remove.bg API key tidak dikonfigurasi! Admin harus set REMOVE_BG_API_KEY di .env', 
+                            flags: 64 
+                        });
+                    }
+
+                    let imageUrl;
+
+                    // Cek attachment langsung dalam message
+                    if (message.attachments.size > 0) {
+                        const attachment = message.attachments.first();
+                        if (!attachment.contentType?.startsWith('image/')) {
+                            return message.reply({ 
+                                content: '❌ Attachment harus berupa gambar! (jpg, png, webp, dll)', 
+                                flags: 64 
+                            });
+                        }
+                        imageUrl = attachment.url;
+                    }
+                    // Cek dari reply message
+                    else if (message.reference) {
+                        const repliedMessage = await message.channel.messages.fetch(message.reference.messageId).catch(() => null);
+                        
+                        if (!repliedMessage) {
+                            return message.reply({ 
+                                content: '❌ Tidak bisa fetch message yang direply!', 
+                                flags: 64 
+                            });
+                        }
+
+                        if (repliedMessage.attachments.size === 0) {
+                            return message.reply({ 
+                                content: '❌ Message yang direply tidak punya attachment/gambar!', 
+                                flags: 64 
+                            });
+                        }
+
+                        const attachment = repliedMessage.attachments.first();
+                        if (!attachment.contentType?.startsWith('image/')) {
+                            return message.reply({ 
+                                content: '❌ Attachment harus berupa gambar!', 
+                                flags: 64 
+                            });
+                        }
+                        imageUrl = attachment.url;
+                    }
+                    else {
+                        return message.reply({ 
+                            content: '❌ Gunakan: `ma.removebg` dengan attachment gambar atau balas ke message dengan gambar!\nContoh: Upload gambar → `ma.removebg`', 
+                            flags: 64 
+                        });
+                    }
+
+                    // Show loading message
+                    const loadingMsg = await message.reply({ 
+                        content: '⏳ Processing gambar... mohon tunggu (bisa sampai 10 detik)' 
+                    });
+
+                    try {
+                        // Call remove.bg API
+                        const response = await axios.post('https://api.remove.bg/v1.0/removebg', 
+                            { image_url: imageUrl },
+                            {
+                                headers: {
+                                    'X-Api-Key': REMOVE_BG_API_KEY
+                                },
+                                responseType: 'arraybuffer'
+                            }
+                        );
+
+                        // Convert to Buffer
+                        const imageBuffer = Buffer.from(response.data, 'binary');
+
+                        // Generate filename
+                        const fileName = `removebg_${Date.now()}.png`;
+
+                        // Send image sebagai file
+                        const successEmbed = new EmbedBuilder()
+                            .setColor('#00FF00')
+                            .setTitle('✅ Background Removed!')
+                            .setDescription('Background dari gambar kamu sudah dihilangkan!')
+                            .setImage(`attachment://${fileName}`)
+                            .setFooter({ text: 'Powered by remove.bg' })
+                            .setTimestamp();
+
+                        // Delete loading message
+                        await loadingMsg.delete().catch(() => {});
+
+                        // Send result
+                        await message.reply({
+                            embeds: [successEmbed],
+                            files: [{
+                                attachment: imageBuffer,
+                                name: fileName
+                            }]
+                        });
+
+                    } catch (apiError) {
+                        // Delete loading message
+                        await loadingMsg.delete().catch(() => {});
+
+                        if (apiError.response?.status === 403) {
+                            return message.reply({
+                                content: '❌ API Key tidak valid atau quota habis! Cek di https://www.remove.bg/api',
+                                flags: 64
+                            });
+                        } else if (apiError.response?.status === 402) {
+                            return message.reply({
+                                content: '❌ API quota habis! Bot owner perlu upgrade di https://www.remove.bg/api',
+                                flags: 64
+                            });
+                        } else if (apiError.response?.status === 400) {
+                            return message.reply({
+                                content: '❌ Gambar tidak valid atau format tidak didukung! Coba gambar lain',
+                                flags: 64
+                            });
+                        }
+                        
+                        throw apiError;
+                    }
+
+                } catch (error) {
+                    console.error('Error executing removebg command:', error);
+                    await message.reply({ 
+                        content: `❌ Error: ${error.message || 'Terjadi kesalahan saat process gambar'}`, 
+                        flags: 64 
+                    });
+                }
+            }
+
             // ma.list - Show all prefix commands
             else if (command === 'list') {
                 try {
@@ -1879,6 +2017,11 @@ client.on('messageCreate', async (message) => {
                             { 
                                 name: 'ma.createrole [name] [color1] [color2]', 
                                 value: 'Buat role baru dengan gradient\nContoh: `ma.createrole VIP #FF0000 #0000FF`\nPerlu: ManageRoles permission', 
+                                inline: false 
+                            },
+                            { 
+                                name: 'ma.removebg', 
+                                value: 'Remove background dari gambar pakai remove.bg API\nContoh: Upload gambar → `ma.removebg` atau reply ke image → `ma.removebg`', 
                                 inline: false 
                             },
                             { 
