@@ -1834,25 +1834,27 @@ client.on('messageCreate', async (message) => {
             // ma.meme - Random meme
             else if (command === 'meme') {
                 try {
-                    const response = await fetch('https://meme-api.herokuapp.com/gimme');
+                    const response = await fetch('https://api.imgflip.com/get_memes');
                     const data = await response.json();
 
-                    if (data.nsfw) {
-                        return await message.reply({ content: '❌ NSFW content filtered! Coba lagi.', flags: 64 });
+                    if (!data.success || !data.data.memes || data.data.memes.length === 0) {
+                        return await message.reply({ content: '❌ Error fetching memes! Try again.', flags: 64 });
                     }
 
+                    // Get random meme
+                    const randomMeme = data.data.memes[Math.floor(Math.random() * data.data.memes.length)];
+
                     const memeEmbed = new EmbedBuilder()
-                        .setTitle(data.title)
-                        .setImage(data.url)
-                        .setURL(data.postLink)
-                        .setFooter({ text: `r/${data.subreddit}` })
+                        .setTitle(randomMeme.name)
+                        .setImage(randomMeme.url)
                         .setColor('#808080')
+                        .setFooter({ text: `Meme #${randomMeme.id}` })
                         .setTimestamp();
 
                     await message.reply({ embeds: [memeEmbed] });
                 } catch (error) {
                     console.error('Error fetching meme:', error);
-                    await message.reply({ content: '❌ Error fetching meme! API sedang down mungkin.', flags: 64 });
+                    await message.reply({ content: '❌ Error fetching meme! API sedang bermasalah.', flags: 64 });
                 }
             }
 
