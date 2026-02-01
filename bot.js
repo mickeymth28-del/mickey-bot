@@ -1,7 +1,7 @@
 const { Client, GatewayIntentBits, EmbedBuilder, ActionRowBuilder, StringSelectMenuBuilder, StringSelectMenuOptionBuilder, PermissionFlagsBits, ButtonBuilder, ButtonStyle, REST, Routes, SlashCommandBuilder, ModalBuilder, TextInputBuilder, TextInputStyle, ChannelType } = require('discord.js');
 const { joinVoiceChannel } = require('@discordjs/voice');
 const axios = require('axios');
-const translate = require('translate-google-api');
+const { translate } = require('@vitalets/google-translate-api');
 require('dotenv').config();
 
 const client = new Client({ 
@@ -2059,10 +2059,9 @@ client.on('messageCreate', async (message) => {
 
                 try {
                     // Translate text to English (auto-detect source language)
-                    // Format: translate(text, null, 'en') -> null = auto-detect, 'en' = target language
-                    const result = await translate(messageText, null, 'en');
-                    const translatedText = result[0];
-                    const detectedLanguage = result[2].lang?.language || 'unknown';
+                    const result = await translate(messageText, { to: 'en' });
+                    const translatedText = result.text;
+                    const detectedLanguage = result.from.language.iso || 'unknown';
 
                     // Jika bukan English, reply dengan translation
                     if (detectedLanguage !== 'en') {
