@@ -1242,7 +1242,7 @@ client.on('messageCreate', async (message) => {
                 try {
                     const roleInput = args.slice(1).join(' ');
                     if (!roleInput) {
-                        return message.reply({ content: '❌ Gunakan: `ma.roleicon [roleID/mention/nama]`\nContoh: `ma.roleicon 123456` atau `ma.roleicon @VIP` atau `ma.roleicon VIP`', flags: 64 });
+                        return message.reply({ content: '❌ Gunakan: `ma.roleicon [roleID/mention/nama]`\nContoh: Reply ke image → `ma.roleicon @VIP`', flags: 64 });
                     }
 
                     let role;
@@ -1264,18 +1264,41 @@ client.on('messageCreate', async (message) => {
                         return message.reply({ content: `❌ Role "${roleInput}" tidak ditemukan!`, flags: 64 });
                     }
 
-                    const roleEmbed = new EmbedBuilder()
-                        .setColor(role.color || '#808080')
-                        .setTitle(`✅ Ikon Role Berhasil Diubah`)
-                        .setDescription(`Ikon untuk role **${role.name}** telah diperbaruhi!`)
-                        .addFields(
-                            { name: 'Role ID', value: role.id, inline: true },
-                            { name: 'Members', value: role.members.size.toString(), inline: true },
-                            { name: 'Created', value: `<t:${Math.floor(role.createdTimestamp / 1000)}:R>`, inline: true }
-                        )
+                    // Check apakah message adalah reply dengan attachment/image
+                    if (!message.reference) {
+                        return message.reply({ content: '❌ Balas ke message dengan gambar terlebih dahulu!', flags: 64 });
+                    }
+
+                    const repliedMessage = await message.channel.messages.fetch(message.reference.messageId).catch(() => null);
+                    if (!repliedMessage || repliedMessage.attachments.size === 0) {
+                        return message.reply({ content: '❌ Message yang direply tidak memiliki attachment/gambar!', flags: 64 });
+                    }
+
+                    const attachment = repliedMessage.attachments.first();
+                    if (!attachment.contentType?.startsWith('image/')) {
+                        return message.reply({ content: '❌ Attachment harus berupa gambar!', flags: 64 });
+                    }
+
+                    // Check permissions
+                    if (!message.member.permissions.has('ManageRoles')) {
+                        return message.reply({ content: '❌ Kamu tidak punya permission untuk mengubah role icon!', flags: 64 });
+                    }
+
+                    if (!message.guild.members.me.permissions.has('ManageRoles')) {
+                        return message.reply({ content: '❌ Bot tidak punya permission untuk mengubah role icon!', flags: 64 });
+                    }
+
+                    // Set role icon
+                    await role.setIcon(attachment.url);
+
+                    const successEmbed = new EmbedBuilder()
+                        .setColor('#00FF00')
+                        .setTitle('✅ Ikon Role Berhasil Diubah')
+                        .setDescription(`Ikon untuk role **${role.name}** telah diperbarui!`)
+                        .setThumbnail(attachment.url)
                         .setTimestamp();
 
-                    await message.reply({ embeds: [roleEmbed] });
+                    await message.reply({ embeds: [successEmbed] });
                 } catch (error) {
                     console.error('Error executing roleicon command:', error);
                     await message.reply({ content: `❌ Error: ${error.message}`, flags: 64 });
