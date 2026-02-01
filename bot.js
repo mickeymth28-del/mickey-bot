@@ -261,19 +261,6 @@ const commands = [
         .setName('disconnect')
         .setDescription('Disconnect bot from voice channel')
         .setDefaultMemberPermissions(PermissionFlagsBits.ManageChannels),
-    new SlashCommandBuilder()
-        .setName('connect')
-        .setDescription('Connect bot to a voice channel')
-        .addChannelOption(option =>
-            option.setName('channel')
-                .setDescription('Voice channel to connect to')
-                .addChannelTypes(ChannelType.GuildVoice)
-                .setRequired(true))
-        .setDefaultMemberPermissions(PermissionFlagsBits.ManageChannels),
-    new SlashCommandBuilder()
-        .setName('disconnect')
-        .setDescription('Disconnect bot from voice channel')
-        .setDefaultMemberPermissions(PermissionFlagsBits.ManageChannels),
 ].map(command => command.toJSON());
 
 const rest = new REST({ version: '10' }).setToken(TOKEN);
