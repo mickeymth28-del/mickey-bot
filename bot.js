@@ -1264,17 +1264,25 @@ client.on('messageCreate', async (message) => {
                         return message.reply({ content: `❌ Role "${roleInput}" tidak ditemukan!`, flags: 64 });
                     }
 
-                    // Check apakah message adalah reply dengan attachment/image
-                    if (!message.reference) {
-                        return message.reply({ content: '❌ Balas ke message dengan gambar terlebih dahulu!', flags: 64 });
+                    // Check attachment dalam message atau dari reply
+                    let attachment;
+                    
+                    // Cek attachment langsung dalam message
+                    if (message.attachments.size > 0) {
+                        attachment = message.attachments.first();
+                    } 
+                    // Cek dari reply message
+                    else if (message.reference) {
+                        const repliedMessage = await message.channel.messages.fetch(message.reference.messageId).catch(() => null);
+                        if (!repliedMessage || repliedMessage.attachments.size === 0) {
+                            return message.reply({ content: '❌ Message yang direply tidak memiliki attachment/gambar!', flags: 64 });
+                        }
+                        attachment = repliedMessage.attachments.first();
+                    } 
+                    else {
+                        return message.reply({ content: '❌ Kirim gambar dalam 1 pesan dengan command atau balas ke message dengan gambar!', flags: 64 });
                     }
 
-                    const repliedMessage = await message.channel.messages.fetch(message.reference.messageId).catch(() => null);
-                    if (!repliedMessage || repliedMessage.attachments.size === 0) {
-                        return message.reply({ content: '❌ Message yang direply tidak memiliki attachment/gambar!', flags: 64 });
-                    }
-
-                    const attachment = repliedMessage.attachments.first();
                     if (!attachment.contentType?.startsWith('image/')) {
                         return message.reply({ content: '❌ Attachment harus berupa gambar!', flags: 64 });
                     }
