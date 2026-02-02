@@ -67,8 +67,39 @@ function saveLogsConfig(config) {
     }
 }
 
+// User points config
+const POINTS_CONFIG_FILE = path.join(CONFIG_DIR, 'user-points.json');
+const LEADERBOARD_CHANNEL_ID = '1432680380103786581';
+
+function loadUserPoints() {
+    try {
+        if (fs.existsSync(POINTS_CONFIG_FILE)) {
+            const data = JSON.parse(fs.readFileSync(POINTS_CONFIG_FILE, 'utf8'));
+            // Check if month changed, reset if needed
+            const currentMonth = new Date().toISOString().slice(0, 7); // YYYY-MM
+            if (data.month !== currentMonth) {
+                console.log('📊 Monthly reset: clearing user points');
+                return { month: currentMonth, users: {} };
+            }
+            return data;
+        }
+    } catch (error) {
+        console.error('Error loading user points:', error);
+    }
+    return { month: new Date().toISOString().slice(0, 7), users: {} };
+}
+
+function saveUserPoints(data) {
+    try {
+        fs.writeFileSync(POINTS_CONFIG_FILE, JSON.stringify(data, null, 2), 'utf8');
+    } catch (error) {
+        console.error('Error saving user points:', error);
+    }
+}
+
 client.boosterConfig = loadBoosterConfig();
 client.logsConfig = loadLogsConfig();
+client.userPoints = loadUserPoints();
 
 // Helper function untuk parse duration (e.g., "1h", "30m", "7d")
 function parseDuration(durationStr) {
@@ -318,6 +349,9 @@ const commands = [
         .setName('disconnect')
         .setDescription('Disconnect bot from voice channel')
         .setDefaultMemberPermissions(PermissionFlagsBits.ManageChannels),
+    new SlashCommandBuilder()
+        .setName('leaderboard')
+        .setDescription('Display top 10 active members with points'),
 ].map(command => command.toJSON());
 
 // Helper function to send logs
@@ -1387,6 +1421,65 @@ client.on('interactionCreate', async (interaction) => {
             }
         }
 
+        if (commandName === 'leaderboard') {
+            try {
+                const pointsData = client.userPoints;
+                const users = pointsData.users || {};
+
+                // Convert to array and sort by points descending
+                const sorted = Object.entries(users)
+                    .map(([userId, points]) => ({ userId, points }))
+                    .sort((a, b) => b.points - a.points)
+                    .slice(0, 10);
+
+                if (sorted.length === 0) {
+                    return await interaction.reply({
+                        content: '❌ Belum ada data leaderboard!',
+                        flags: 64
+                    });
+                }
+
+                // Create leaderboard description
+                const currentMonth = new Date().toLocaleString('en-US', { month: 'long', year: 'numeric' });
+                let description = '';
+
+                for (let i = 0; i < sorted.length; i++) {
+                    const { userId, points } = sorted[i];
+                    let medal = '';
+                    if (i === 0) medal = '🥇';
+                    else if (i === 1) medal = '🥈';
+                    else if (i === 2) medal = '🥉';
+                    else medal = `${i + 1}️⃣`;
+
+                    let memberName = 'Unknown User';
+                    try {
+                        const member = await interaction.guild.members.fetch(userId);
+                        memberName = member.user.username;
+                    } catch (e) {
+                        memberName = `<@${userId}>`;
+                    }
+
+                    const formattedPoints = points.toLocaleString();
+                    description += `${medal} **${memberName}** - ${formattedPoints} Points\n`;
+                }
+
+                const leaderboardEmbed = new EmbedBuilder()
+                    .setColor('#FFD700')
+                    .setTitle('Top Active Members Leaderboard')
+                    .setDescription(`Period: ${currentMonth}\n\n${description}`)
+                    .setFooter({ text: 'Congratulations to the Top Active Members! 🎉' })
+                    .setTimestamp();
+
+                await interaction.reply({ embeds: [leaderboardEmbed] });
+            } catch (error) {
+                console.error('Error fetching leaderboard:', error);
+                await interaction.reply({
+                    content: `❌ Error: ${error.message}`,
+                    flags: 64
+                });
+            }
+        }
+
     }
 
     // Handle modal submissions
@@ -1686,6 +1779,27 @@ client.on('messageCreate', async (message) => {
 
     // Ignore DMs
     if (!message.guild) return;
+
+    // Track XP for leaderboard (only in kelas-umum channel)
+    if (message.channelId === LEADERBOARD_CHANNEL_ID) {
+        try {
+            const pointsData = client.userPoints;
+            const userId = message.author.id;
+            
+            // Random XP between 1-5
+            const xpGain = Math.floor(Math.random() * 5) + 1;
+            
+            if (!pointsData.users[userId]) {
+                pointsData.users[userId] = 0;
+            }
+            pointsData.users[userId] += xpGain;
+            
+            // Save to file
+            saveUserPoints(pointsData);
+        } catch (error) {
+            console.error('Error tracking XP:', error);
+        }
+    }
 
     try {
         // Handle prefix commands
