@@ -732,14 +732,6 @@ client.on('interactionCreate', async (interaction) => {
                 }
 
                 await interaction.reply({ content: '✅ Message berhasil dikirim!', flags: 64 });
-
-                // Log the admin action
-                await sendLog(
-                    interaction.guild,
-                    '📢 Admin Message Sent',
-                    `**Author:** ${interaction.user.tag}\n**Channel:** ${interaction.channel.name}\n**Message:** ${text.substring(0, 100)}${text.length > 100 ? '...' : ''}`,
-                    '#0099FF'
-                );
             } catch (error) {
                 console.error('Error sending message:', error);
                 await interaction.reply({ 
@@ -1498,14 +1490,6 @@ client.on('interactionCreate', async (interaction) => {
                     content: '✅ Embed sent successfully!',
                     flags: 64
                 });
-
-                // Log the embed creation
-                await sendLog(
-                    interaction.guild,
-                    '📊 Embed Created & Sent',
-                    `**Author:** ${interaction.user.tag}\n**Channel:** ${interaction.channel.name}\n**Title:** ${embedData.embed.data.title || 'No title'}`,
-                    '#9900FF'
-                );
             } catch (error) {
                 console.error('Error sending embed:', error);
                 await interaction.reply({
