@@ -381,32 +381,32 @@ async function sendLog(guild, title, description, color = '#FF9900') {
 // Generate leaderboard image with top 3 members
 async function generateLeaderboardImage(topMembers, month) {
     try {
-        const canvas = createCanvas(1200, 700);
+        const canvas = createCanvas(1200, 500);
         const ctx = canvas.getContext('2d');
 
-        // Background gradient
-        const gradient = ctx.createLinearGradient(0, 0, 1200, 700);
-        gradient.addColorStop(0, '#1a1a2e');
-        gradient.addColorStop(1, '#16213e');
+        // Background gradient (darker)
+        const gradient = ctx.createLinearGradient(0, 0, 1200, 500);
+        gradient.addColorStop(0, '#0f0f1e');
+        gradient.addColorStop(1, '#1a1a2e');
         ctx.fillStyle = gradient;
-        ctx.fillRect(0, 0, 1200, 700);
+        ctx.fillRect(0, 0, 1200, 500);
 
         // Title
-        ctx.font = 'bold 60px Arial';
-        ctx.fillStyle = '#ffffff';
+        ctx.font = 'bold 48px Arial';
+        ctx.fillStyle = '#FFD700';
         ctx.textAlign = 'center';
-        ctx.fillText('TOP ACTIVE MEMBERS', 600, 80);
+        ctx.fillText('TOP ACTIVE MEMBERS', 600, 60);
 
-        // Period
-        ctx.font = '32px Arial';
+        // Period text
+        ctx.font = '24px Arial';
         ctx.fillStyle = '#b0b0b0';
-        ctx.fillText(month, 600, 130);
+        ctx.fillText(month, 600, 95);
 
-        // Draw top 3 members
+        // Draw top 3 members in a horizontal row
         const positions = [
-            { x: 600, y: 300, medal: '1', color: '#FFD700', size: 200 }, // 1st - center, gold
-            { x: 250, y: 400, medal: '2', color: '#C0C0C0', size: 140 }, // 2nd - left, silver
-            { x: 950, y: 400, medal: '3', color: '#CD7F32', size: 140 }  // 3rd - right, bronze
+            { x: 300, y: 280, medal: '🥇', size: 120, medalSize: 45 }, // 1st - left (silver)
+            { x: 600, y: 220, medal: '🥇', size: 140, medalSize: 50 }, // 1st - center (gold, biggest)
+            { x: 900, y: 280, medal: '🥉', size: 120, medalSize: 45 }  // 3rd - right (bronze)
         ];
 
         for (let i = 0; i < Math.min(3, topMembers.length); i++) {
@@ -421,49 +421,47 @@ async function generateLeaderboardImage(topMembers, month) {
                 // Load and draw circular avatar
                 const avatar = await loadImage(avatarUrl);
                 
-                // Draw circle background for avatar
-                ctx.fillStyle = pos.color;
+                // Draw medal emoji at top
+                ctx.font = `${pos.medalSize}px Arial`;
+                ctx.textAlign = 'center';
+                ctx.fillText(pos.medal, pos.x, pos.y - 90);
+
+                // Draw avatar circle with border
+                ctx.fillStyle = '#FFD700';
                 ctx.beginPath();
-                ctx.arc(pos.x, pos.y - 30, pos.size / 2 + 10, 0, Math.PI * 2);
+                ctx.arc(pos.x, pos.y, pos.size / 2 + 5, 0, Math.PI * 2);
                 ctx.fill();
 
                 // Draw avatar image (circular)
                 ctx.save();
                 ctx.beginPath();
-                ctx.arc(pos.x, pos.y - 30, pos.size / 2, 0, Math.PI * 2);
+                ctx.arc(pos.x, pos.y, pos.size / 2, 0, Math.PI * 2);
                 ctx.clip();
-                ctx.drawImage(avatar, pos.x - pos.size / 2, pos.y - 30 - pos.size / 2, pos.size, pos.size);
+                ctx.drawImage(avatar, pos.x - pos.size / 2, pos.y - pos.size / 2, pos.size, pos.size);
                 ctx.restore();
 
-                // Draw medal number
-                const medalSize = pos.size / 3;
-                ctx.font = `bold ${medalSize}px Arial`;
-                ctx.fillStyle = pos.color;
+                // Draw rank number below avatar
+                ctx.font = 'bold 32px Arial';
+                ctx.fillStyle = '#FFD700';
                 ctx.textAlign = 'center';
-                ctx.fillText(pos.medal, pos.x, pos.y - 30 + pos.size / 2 + medalSize / 2);
+                ctx.fillText(`#${i + 1}`, pos.x, pos.y + pos.size / 2 + 45);
 
                 // Draw username
                 const username = member?.user?.username || 'Unknown';
-                ctx.font = '20px Arial';
+                ctx.font = '18px Arial';
                 ctx.fillStyle = '#ffffff';
                 ctx.textAlign = 'center';
-                ctx.fillText(username, pos.x, pos.y + pos.size / 2 + 50);
+                ctx.fillText(username.substring(0, 15), pos.x, pos.y + pos.size / 2 + 75);
 
                 // Draw points
-                ctx.font = 'bold 18px Arial';
-                ctx.fillStyle = pos.color;
+                ctx.font = 'bold 20px Arial';
+                ctx.fillStyle = '#FFD700';
                 const formattedPoints = points.toLocaleString();
-                ctx.fillText(`${formattedPoints} Points`, pos.x, pos.y + pos.size / 2 + 80);
+                ctx.fillText(`${formattedPoints} pts`, pos.x, pos.y + pos.size / 2 + 105);
             } catch (error) {
                 console.error(`Error drawing member ${i}:`, error);
             }
         }
-
-        // Footer text
-        ctx.font = '18px Arial';
-        ctx.fillStyle = '#888888';
-        ctx.textAlign = 'center';
-        ctx.fillText('Congratulations to the Top Active Members! 🎉', 600, 650);
 
         return canvas.toBuffer('image/png');
     } catch (error) {
@@ -1536,7 +1534,25 @@ client.on('interactionCreate', async (interaction) => {
 
                 const currentMonth = new Date().toLocaleString('en-US', { month: 'long', year: 'numeric' });
 
-                // Fetch member data for top 3
+                // Build top 10 text list
+                let topTenList = '';
+                const medals = ['🥇', '🥈', '🥉', '4️⃣', '5️⃣', '6️⃣', '7️⃣', '8️⃣', '9️⃣', '🔟'];
+
+                for (let i = 0; i < Math.min(10, sorted.length); i++) {
+                    const { userId, points } = sorted[i];
+                    let memberName = 'Unknown User';
+                    try {
+                        const member = await interaction.guild.members.fetch(userId);
+                        memberName = member.user.username;
+                    } catch (e) {
+                        memberName = `<@${userId}>`;
+                    }
+
+                    const formattedPoints = points.toLocaleString();
+                    topTenList += `${medals[i]} **${memberName}**\n┗ ➜ ${formattedPoints} Points\n`;
+                }
+
+                // Fetch member data for top 3 (for canvas image)
                 const topMembers = [];
                 for (let i = 0; i < Math.min(3, sorted.length); i++) {
                     const { userId, points } = sorted[i];
@@ -1548,47 +1564,34 @@ client.on('interactionCreate', async (interaction) => {
                     }
                 }
 
-                // Generate image
+                // Generate image for top 3
                 const imageBuffer = await generateLeaderboardImage(topMembers, currentMonth);
-                if (!imageBuffer) {
-                    return await interaction.editReply({
-                        content: '❌ Error generating leaderboard image!',
-                    });
-                }
+                const attachment = imageBuffer ? new AttachmentBuilder(imageBuffer, { name: 'leaderboard.png' }) : null;
 
-                // Create attachment
-                const attachment = new AttachmentBuilder(imageBuffer, { name: 'leaderboard.png' });
-
-                // Create embed with remaining top members (4-10)
-                let description = '';
-                for (let i = 3; i < Math.min(10, sorted.length); i++) {
-                    const { userId, points } = sorted[i];
-                    const medal = `${i + 1}️⃣`;
-
-                    let memberName = 'Unknown User';
-                    try {
-                        const member = await interaction.guild.members.fetch(userId);
-                        memberName = member.user.username;
-                    } catch (e) {
-                        memberName = `<@${userId}>`;
-                    }
-
-                    const formattedPoints = points.toLocaleString();
-                    description += `${medal} **${memberName}** - ${formattedPoints} Points\n`;
-                }
-
+                // Create main embed with top 10 list
                 const leaderboardEmbed = new EmbedBuilder()
                     .setColor('#FFD700')
-                    .setTitle('Top 10 Active Members')
-                    .setImage('attachment://leaderboard.png')
-                    .setDescription(description || 'Only 3 members in ranking')
-                    .setFooter({ text: `Period: ${currentMonth}` })
+                    .setTitle('🏆 Top 10 Active Members')
+                    .setDescription(topTenList)
+                    .addFields(
+                        { name: 'Period', value: currentMonth, inline: true },
+                        { name: 'Total Members', value: `${sorted.length}`, inline: true }
+                    )
+                    .setFooter({ text: 'Congratulations to the Top Active Members! 🎉' })
                     .setTimestamp();
 
-                await interaction.editReply({ 
-                    embeds: [leaderboardEmbed],
-                    files: [attachment]
-                });
+                // Add image if available
+                if (attachment) {
+                    leaderboardEmbed.setImage('attachment://leaderboard.png');
+                    await interaction.editReply({ 
+                        embeds: [leaderboardEmbed],
+                        files: [attachment]
+                    });
+                } else {
+                    await interaction.editReply({ 
+                        embeds: [leaderboardEmbed]
+                    });
+                }
             } catch (error) {
                 console.error('Error fetching leaderboard:', error);
                 await interaction.editReply({
