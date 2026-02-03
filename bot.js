@@ -938,7 +938,7 @@ client.on('interactionCreate', async (interaction) => {
                     .setThumbnail(user.displayAvatarURL())
                     .setTimestamp();
 
-                await interaction.reply({ embeds: [banEmbed], flags: 64 });
+                await interaction.reply({ embeds: [banEmbed] });
 
                 // Send to logs channel
                 await sendLog(
@@ -992,7 +992,7 @@ client.on('interactionCreate', async (interaction) => {
                     .setThumbnail(user.displayAvatarURL())
                     .setTimestamp();
 
-                await interaction.reply({ embeds: [kickEmbed], flags: 64 });
+                await interaction.reply({ embeds: [kickEmbed] });
 
                 // Send to logs channel
                 await sendLog(
@@ -1038,7 +1038,7 @@ client.on('interactionCreate', async (interaction) => {
                     )
                     .setTimestamp();
 
-                await interaction.reply({ embeds: [unbanEmbed], flags: 64 });
+                await interaction.reply({ embeds: [unbanEmbed] });
 
                 // Send to logs channel
                 await sendLog(
@@ -1370,7 +1370,7 @@ client.on('interactionCreate', async (interaction) => {
                     .setThumbnail(user.displayAvatarURL())
                     .setTimestamp();
 
-                await interaction.reply({ embeds: [timeoutEmbed], flags: 64 });
+                await interaction.reply({ embeds: [timeoutEmbed] });
 
                 // Send to logs channel
                 await sendLog(
@@ -1424,7 +1424,7 @@ client.on('interactionCreate', async (interaction) => {
                     .setThumbnail(user.displayAvatarURL())
                     .setTimestamp();
 
-                await interaction.reply({ embeds: [unmuteEmbed], flags: 64 });
+                await interaction.reply({ embeds: [unmuteEmbed] });
 
                 // Send to logs channel
                 await sendLog(
@@ -1472,7 +1472,7 @@ client.on('interactionCreate', async (interaction) => {
                     .setThumbnail(user.displayAvatarURL())
                     .setTimestamp();
 
-                await interaction.reply({ embeds: [muteEmbed], flags: 64 });
+                await interaction.reply({ embeds: [muteEmbed] });
 
                 // Send to logs channel
                 await sendLog(
