@@ -939,6 +939,9 @@ client.on('interactionCreate', async (interaction) => {
                     .setTimestamp();
 
                 await interaction.reply({ content: '✅ User banned!', flags: 64 });
+
+                // Send to logs channel
+                await sendLog(
                     interaction.guild,
                     '⛔ User Banned',
                     `**User:** ${user.tag} (${user.id})\n**Reason:** ${reason}\n**Banned by:** ${interaction.user.tag}`,
@@ -990,6 +993,9 @@ client.on('interactionCreate', async (interaction) => {
                     .setTimestamp();
 
                 await interaction.reply({ content: '✅ User kicked!', flags: 64 });
+
+                // Send to logs channel
+                await sendLog(
                     interaction.guild,
                     '👢 User Kicked',
                     `**User:** ${user.tag} (${user.id})\n**Reason:** ${reason}\n**Kicked by:** ${interaction.user.tag}`,
@@ -1033,6 +1039,9 @@ client.on('interactionCreate', async (interaction) => {
                     .setTimestamp();
 
                 await interaction.reply({ content: '✅ User unbanned!', flags: 64 });
+
+                // Send to logs channel
+                await sendLog(
                     interaction.guild,
                     '✅ User Unbanned',
                     `**User ID:** ${userId}\n**Reason:** ${reason}\n**Unbanned by:** ${interaction.user.tag}`,
@@ -1362,6 +1371,9 @@ client.on('interactionCreate', async (interaction) => {
                     .setTimestamp();
 
                 await interaction.reply({ content: '✅ User timed out!', flags: 64 });
+
+                // Send to logs channel
+                await sendLog(
                     interaction.guild,
                     '⏱️ User Timed Out',
                     `**User:** ${user.tag} (${user.id})\n**Duration:** ${duration}\n**Reason:** ${reason}\n**Timed out by:** ${interaction.user.tag}`,
@@ -1413,6 +1425,9 @@ client.on('interactionCreate', async (interaction) => {
                     .setTimestamp();
 
                 await interaction.reply({ content: '✅ User unmuted!', flags: 64 });
+
+                // Send to logs channel
+                await sendLog(
                     interaction.guild,
                     '✅ User Unmuted',
                     `**User:** ${user.tag} (${user.id})\n**Reason:** ${reason}\n**Unmuted by:** ${interaction.user.tag}`,
@@ -1458,6 +1473,9 @@ client.on('interactionCreate', async (interaction) => {
                     .setTimestamp();
 
                 await interaction.reply({ content: '✅ User muted!', flags: 64 });
+
+                // Send to logs channel
+                await sendLog(
                     interaction.guild,
                     '🔇 User Muted (Permanent)',
                     `**User:** ${user.tag} (${user.id})\n**Reason:** ${reason}\n**Muted by:** ${interaction.user.tag}\n**Type:** Permanent (until unmuted)`,
