@@ -1306,7 +1306,14 @@ client.on('interactionCreate', async (interaction) => {
                     .setDescription('Bot akan log semua moderation actions di channel ini (ban, kick, timeout, mute, dll)')
                     .setTimestamp();
 
-                await interaction.reply({ embeds: [setupEmbed], flags: 64 });
+                // Send ke logs channel
+                await channel.send({ embeds: [setupEmbed] });
+                
+                // Reply ke admin dengan ephemeral
+                await interaction.reply({ 
+                    content: '✅ Logs channel berhasil di-setup!',
+                    flags: 64 
+                });
             } catch (error) {
                 console.error('Error setting up logs channel:', error);
                 await interaction.reply({
