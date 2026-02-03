@@ -109,6 +109,8 @@ const musicManager = {
 const CONFIG_DIR = path.join(__dirname, 'config');
 const BOOSTER_CONFIG_FILE = path.join(CONFIG_DIR, 'booster-config.json');
 const LOGS_CONFIG_FILE = path.join(CONFIG_DIR, 'logs-config.json');
+const GIVEAWAY_CONFIG_FILE = path.join(CONFIG_DIR, 'giveaway-config.json');
+const GIVEAWAY_SETTINGS_FILE = path.join(CONFIG_DIR, 'giveaway-settings.json');
 
 // Ensure config directory exists
 if (!fs.existsSync(CONFIG_DIR)) {
@@ -154,7 +156,58 @@ function saveLogsConfig(config) {
     }
 }
 
+function loadGiveawayConfig() {
+    try {
+        if (fs.existsSync(GIVEAWAY_CONFIG_FILE)) {
+            return JSON.parse(fs.readFileSync(GIVEAWAY_CONFIG_FILE, 'utf8'));
+        }
+    } catch (error) {
+        console.error('Error loading giveaway config:', error);
+    }
+    return {};
+}
+
+function saveGiveawayConfig(config) {
+    try {
+        fs.writeFileSync(GIVEAWAY_CONFIG_FILE, JSON.stringify(config, null, 2), 'utf8');
+    } catch (error) {
+        console.error('Error saving giveaway config:', error);
+    }
+}
+
+function loadGiveawaySettings() {
+    try {
+        if (fs.existsSync(GIVEAWAY_SETTINGS_FILE)) {
+            return JSON.parse(fs.readFileSync(GIVEAWAY_SETTINGS_FILE, 'utf8'));
+        }
+    } catch (error) {
+        console.error('Error loading giveaway settings:', error);
+    }
+    return {};
+}
+
+function saveGiveawaySettings(settings) {
+    try {
+        fs.writeFileSync(GIVEAWAY_SETTINGS_FILE, JSON.stringify(settings, null, 2), 'utf8');
+    } catch (error) {
+        console.error('Error saving giveaway settings:', error);
+    }
+}
+
 // User points config
+
+// Helper function untuk format duration untuk display
+function formatDuration(ms) {
+    const seconds = Math.floor(ms / 1000);
+    const minutes = Math.floor(seconds / 60);
+    const hours = Math.floor(minutes / 60);
+    const days = Math.floor(hours / 24);
+
+    if (days > 0) return `${days}d ${hours % 24}h`;
+    if (hours > 0) return `${hours}h ${minutes % 60}m`;
+    if (minutes > 0) return `${minutes}m ${seconds % 60}s`;
+    return `${seconds}s`;
+}
 
 // Helper function untuk parse duration (e.g., "1h", "30m", "7d")
 function parseDuration(durationStr) {
@@ -430,6 +483,72 @@ const commands = [
         .setName('resume')
         .setDescription('Resume music')
         .setDefaultMemberPermissions(PermissionFlagsBits.ManageChannels),
+    new SlashCommandBuilder()
+        .setName('gstart')
+        .setDescription('Start a giveaway')
+        .addStringOption(option =>
+            option.setName('time')
+                .setDescription('Duration (e.g., 30s, 5m, 24h, 7d)')
+                .setRequired(true))
+        .addIntegerOption(option =>
+            option.setName('winners')
+                .setDescription('Number of winners')
+                .setMinValue(1)
+                .setMaxValue(50)
+                .setRequired(true))
+        .addStringOption(option =>
+            option.setName('prize')
+                .setDescription('Prize description')
+                .setRequired(true))
+        .setDefaultMemberPermissions(PermissionFlagsBits.ManageMessages),
+    new SlashCommandBuilder()
+        .setName('gend')
+        .setDescription('End a giveaway and pick winners')
+        .addStringOption(option =>
+            option.setName('giveaway_id')
+                .setDescription('Giveaway ID')
+                .setRequired(true))
+        .setDefaultMemberPermissions(PermissionFlagsBits.ManageMessages),
+    new SlashCommandBuilder()
+        .setName('greroll')
+        .setDescription('Reroll winners for a giveaway')
+        .addStringOption(option =>
+            option.setName('giveaway_id')
+                .setDescription('Giveaway ID')
+                .setRequired(true))
+        .setDefaultMemberPermissions(PermissionFlagsBits.ManageMessages),
+    new SlashCommandBuilder()
+        .setName('gdelete')
+        .setDescription('Delete a giveaway')
+        .addStringOption(option =>
+            option.setName('giveaway_id')
+                .setDescription('Giveaway ID')
+                .setRequired(true))
+        .setDefaultMemberPermissions(PermissionFlagsBits.ManageMessages),
+    new SlashCommandBuilder()
+        .setName('glist')
+        .setDescription('List all active giveaways'),
+    new SlashCommandBuilder()
+        .setName('gsettings')
+        .setDescription('Configure giveaway settings')
+        .addSubcommand(subcommand =>
+            subcommand.setName('show')
+                .setDescription('Show current settings'))
+        .addSubcommand(subcommand =>
+            subcommand.setName('set-color')
+                .setDescription('Set embed color')
+                .addStringOption(option =>
+                    option.setName('color')
+                        .setDescription('Hex color code (e.g., #FF0000)')
+                        .setRequired(true)))
+        .addSubcommand(subcommand =>
+            subcommand.setName('set-emoji')
+                .setDescription('Set join emoji')
+                .addStringOption(option =>
+                    option.setName('emoji')
+                        .setDescription('Emoji to use for joining')
+                        .setRequired(true)))
+        .setDefaultMemberPermissions(PermissionFlagsBits.ManageMessages),
 ].map(command => command.toJSON());
 
 // Helper function to send logs
@@ -452,6 +571,127 @@ async function sendLog(guild, title, description, color = '#FF9900') {
         });
     } catch (error) {
         console.error('Error in sendLog:', error);
+    }
+}
+
+// Giveaway helper functions
+const giveawayTimers = new Map(); // Store timeout IDs
+
+async function endGiveaway(giveawayId, guild) {
+    try {
+        const giveaways = loadGiveawayConfig();
+        const giveaway = giveaways[giveawayId];
+
+        if (!giveaway) return;
+
+        giveaway.ended = true;
+        saveGiveawayConfig(giveaways);
+
+        const channel = guild?.channels.cache.get(giveaway.channelId);
+        if (!channel) return;
+
+        try {
+            const message = await channel.messages.fetch(giveaway.messageId);
+            
+            // Update message to show it ended
+            const endedEmbed = new EmbedBuilder()
+                .setColor(giveaway.color)
+                .setTitle('🎁 GIVEAWAY - ENDED')
+                .setDescription(`React with ${giveaway.emoji} to enter!\n\n**Prize:** ${giveaway.prize}\n**Status:** Ended`)
+                .addFields(
+                    { name: 'Winners', value: `${giveaway.winners}`, inline: true },
+                    { name: 'Participants', value: `${giveaway.participants.length}`, inline: true }
+                )
+                .setFooter({ text: `Giveaway ID: ${giveawayId}` })
+                .setTimestamp();
+
+            await message.edit({ embeds: [endedEmbed] });
+        } catch (error) {
+            console.error('Error updating giveaway message:', error);
+        }
+
+        // Pick winners
+        if (giveaway.participants.length === 0) {
+            const noWinnersEmbed = new EmbedBuilder()
+                .setColor(giveaway.color)
+                .setTitle('❌ No Winners')
+                .setDescription(`No one participated in the giveaway for **${giveaway.prize}**`)
+                .setFooter({ text: `Giveaway ID: ${giveawayId}` })
+                .setTimestamp();
+
+            await channel.send({ embeds: [noWinnersEmbed] });
+        } else {
+            const winners = [];
+            const availableParticipants = [...giveaway.participants];
+            const numWinners = Math.min(giveaway.winners, availableParticipants.length);
+
+            for (let i = 0; i < numWinners; i++) {
+                const randomIdx = Math.floor(Math.random() * availableParticipants.length);
+                winners.push(availableParticipants[randomIdx]);
+                availableParticipants.splice(randomIdx, 1);
+            }
+
+            const winnerMentions = winners.map(id => `<@${id}>`).join(', ');
+            const winnersEmbed = new EmbedBuilder()
+                .setColor(giveaway.color)
+                .setTitle('🎉 Giveaway Winners!')
+                .setDescription(`**Prize:** ${giveaway.prize}\n\n**Winners:** ${winnerMentions}`)
+                .addFields({
+                    name: 'Congratulations!',
+                    value: 'You have won the giveaway! Check your DMs for more info.',
+                    inline: false
+                })
+                .setFooter({ text: `Giveaway ID: ${giveawayId}` })
+                .setTimestamp();
+
+            await channel.send({ embeds: [winnersEmbed] });
+
+            // Send DM to winners
+            for (const winnerId of winners) {
+                try {
+                    const user = await client.users.fetch(winnerId);
+                    const dmEmbed = new EmbedBuilder()
+                        .setColor(giveaway.color)
+                        .setTitle('🎉 Congratulations!')
+                        .setDescription(`You won the giveaway for **${giveaway.prize}** in ${guild.name}!`)
+                        .setFooter({ text: 'Mickey Trap Academy' })
+                        .setTimestamp();
+
+                    await user.send({ embeds: [dmEmbed] }).catch(() => {});
+                } catch (error) {
+                    console.error(`Error sending DM to winner ${winnerId}:`, error);
+                }
+            }
+        }
+    } catch (error) {
+        console.error('Error ending giveaway:', error);
+    }
+}
+
+function scheduleGiveawayEnd(giveawayId) {
+    try {
+        const giveaways = loadGiveawayConfig();
+        const giveaway = giveaways[giveawayId];
+
+        if (!giveaway) return;
+
+        const timeUntilEnd = Math.max(0, giveaway.endsAt - Date.now());
+
+        if (giveawayTimers.has(giveawayId)) {
+            clearTimeout(giveawayTimers.get(giveawayId));
+        }
+
+        const timerId = setTimeout(() => {
+            const guild = client.guilds.cache.get(giveaway.guildId);
+            if (guild) {
+                endGiveaway(giveawayId, guild);
+            }
+            giveawayTimers.delete(giveawayId);
+        }, timeUntilEnd);
+
+        giveawayTimers.set(giveawayId, timerId);
+    } catch (error) {
+        console.error('Error scheduling giveaway end:', error);
     }
 }
 
@@ -535,6 +775,19 @@ client.once('clientReady', () => {
     client.boosterConfig = loadBoosterConfig();
     client.logsConfig = loadLogsConfig();
     console.log('📁 Configs loaded from file');
+    
+    // Load and schedule giveaways
+    const giveaways = loadGiveawayConfig();
+    let activeGiveawaysCount = 0;
+    for (const [giveawayId, giveaway] of Object.entries(giveaways)) {
+        if (!giveaway.ended && giveaway.endsAt > Date.now()) {
+            scheduleGiveawayEnd(giveawayId);
+            activeGiveawaysCount++;
+        }
+    }
+    if (activeGiveawaysCount > 0) {
+        console.log(`🎁 ${activeGiveawaysCount} active giveaways scheduled`);
+    }
     
     // Set rotating presence
     const activities = [
@@ -1799,6 +2052,320 @@ client.on('interactionCreate', async (interaction) => {
             }
         }
 
+        // Giveaway Commands
+        if (commandName === 'gstart') {
+            try {
+                const timeStr = interaction.options.getString('time');
+                const winners = interaction.options.getInteger('winners');
+                const prize = interaction.options.getString('prize');
+
+                const durationMs = parseDuration(timeStr);
+                if (!durationMs) {
+                    return await interaction.reply({
+                        content: '❌ Invalid time format! Use: 30s, 5m, 24h, or 7d',
+                        flags: 64
+                    });
+                }
+
+                // Generate giveaway ID
+                const giveawayId = `${interaction.guildId}-${Date.now()}`;
+                
+                // Load settings
+                const settings = loadGiveawaySettings();
+                const guildSettings = settings[interaction.guildId] || {
+                    color: '#FF00FF',
+                    emoji: '🎉'
+                };
+
+                // Create embed
+                const giveawayEmbed = new EmbedBuilder()
+                    .setColor(guildSettings.color)
+                    .setTitle('🎁 GIVEAWAY')
+                    .setDescription(`React with ${guildSettings.emoji} to enter!\n\n**Prize:** ${prize}\n**Ends:** <t:${Math.floor((Date.now() + durationMs) / 1000)}:R>`)
+                    .addFields(
+                        { name: 'Winners', value: `${winners}`, inline: true },
+                        { name: 'Participants', value: '0', inline: true }
+                    )
+                    .setFooter({ text: `Giveaway ID: ${giveawayId}` })
+                    .setTimestamp();
+
+                // Send giveaway message
+                const giveawayMsg = await interaction.channel.send({ embeds: [giveawayEmbed] });
+                
+                // Add reaction
+                await giveawayMsg.react(guildSettings.emoji);
+
+                // Load giveaway config
+                const giveaways = loadGiveawayConfig();
+
+                // Store giveaway data
+                giveaways[giveawayId] = {
+                    guildId: interaction.guildId,
+                    channelId: interaction.channelId,
+                    messageId: giveawayMsg.id,
+                    prize: prize,
+                    winners: winners,
+                    createdAt: Date.now(),
+                    endsAt: Date.now() + durationMs,
+                    participants: [],
+                    ended: false,
+                    color: guildSettings.color,
+                    emoji: guildSettings.emoji
+                };
+
+                saveGiveawayConfig(giveaways);
+
+                // Schedule giveaway end
+                scheduleGiveawayEnd(giveawayId);
+
+                await interaction.reply({
+                    content: `✅ Giveaway started! ID: \`${giveawayId}\``,
+                    flags: 64
+                });
+            } catch (error) {
+                console.error('Error in gstart command:', error);
+                await interaction.reply({
+                    content: `❌ Error: ${error.message}`,
+                    flags: 64
+                });
+            }
+        }
+
+        if (commandName === 'gend') {
+            try {
+                const giveawayId = interaction.options.getString('giveaway_id');
+                const giveaways = loadGiveawayConfig();
+                const giveaway = giveaways[giveawayId];
+
+                if (!giveaway) {
+                    return await interaction.reply({
+                        content: '❌ Giveaway not found!',
+                        flags: 64
+                    });
+                }
+
+                if (giveaway.ended) {
+                    return await interaction.reply({
+                        content: '❌ Giveaway already ended!',
+                        flags: 64
+                    });
+                }
+
+                // End the giveaway
+                await endGiveaway(giveawayId, interaction.guild);
+
+                await interaction.reply({
+                    content: `✅ Giveaway ended!`,
+                    flags: 64
+                });
+            } catch (error) {
+                console.error('Error in gend command:', error);
+                await interaction.reply({
+                    content: `❌ Error: ${error.message}`,
+                    flags: 64
+                });
+            }
+        }
+
+        if (commandName === 'greroll') {
+            try {
+                const giveawayId = interaction.options.getString('giveaway_id');
+                const giveaways = loadGiveawayConfig();
+                const giveaway = giveaways[giveawayId];
+
+                if (!giveaway) {
+                    return await interaction.reply({
+                        content: '❌ Giveaway not found!',
+                        flags: 64
+                    });
+                }
+
+                if (!giveaway.ended) {
+                    return await interaction.reply({
+                        content: '❌ Giveaway is still running! End it first.',
+                        flags: 64
+                    });
+                }
+
+                if (giveaway.participants.length === 0) {
+                    return await interaction.reply({
+                        content: '❌ No participants in this giveaway!',
+                        flags: 64
+                    });
+                }
+
+                // Pick new winners
+                const winners = [];
+                const availableParticipants = [...giveaway.participants];
+                const numWinners = Math.min(giveaway.winners, availableParticipants.length);
+
+                for (let i = 0; i < numWinners; i++) {
+                    const randomIdx = Math.floor(Math.random() * availableParticipants.length);
+                    winners.push(availableParticipants[randomIdx]);
+                    availableParticipants.splice(randomIdx, 1);
+                }
+
+                // Create winners announcement
+                const guild = client.guilds.cache.get(giveaway.guildId);
+                const channel = guild?.channels.cache.get(giveaway.channelId);
+
+                if (channel) {
+                    const winnerMentions = winners.map(id => `<@${id}>`).join(', ');
+                    const rerollEmbed = new EmbedBuilder()
+                        .setColor(giveaway.color)
+                        .setTitle('🎉 Giveaway Rerolled!')
+                        .setDescription(`**Prize:** ${giveaway.prize}\n\n**New Winners:** ${winnerMentions}`)
+                        .setFooter({ text: `Giveaway ID: ${giveawayId}` })
+                        .setTimestamp();
+
+                    await channel.send({ embeds: [rerollEmbed] });
+                }
+
+                await interaction.reply({
+                    content: `✅ New winners selected!`,
+                    flags: 64
+                });
+            } catch (error) {
+                console.error('Error in greroll command:', error);
+                await interaction.reply({
+                    content: `❌ Error: ${error.message}`,
+                    flags: 64
+                });
+            }
+        }
+
+        if (commandName === 'gdelete') {
+            try {
+                const giveawayId = interaction.options.getString('giveaway_id');
+                const giveaways = loadGiveawayConfig();
+
+                if (!giveaways[giveawayId]) {
+                    return await interaction.reply({
+                        content: '❌ Giveaway not found!',
+                        flags: 64
+                    });
+                }
+
+                delete giveaways[giveawayId];
+                saveGiveawayConfig(giveaways);
+
+                await interaction.reply({
+                    content: `✅ Giveaway deleted!`,
+                    flags: 64
+                });
+            } catch (error) {
+                console.error('Error in gdelete command:', error);
+                await interaction.reply({
+                    content: `❌ Error: ${error.message}`,
+                    flags: 64
+                });
+            }
+        }
+
+        if (commandName === 'glist') {
+            try {
+                const giveaways = loadGiveawayConfig();
+                const guildGiveaways = Object.entries(giveaways).filter(([_, g]) => g.guildId === interaction.guildId);
+
+                if (guildGiveaways.length === 0) {
+                    return await interaction.reply({
+                        content: '❌ No giveaways found!',
+                        flags: 64
+                    });
+                }
+
+                const listEmbed = new EmbedBuilder()
+                    .setColor('#FF00FF')
+                    .setTitle('🎁 Active Giveaways')
+                    .setFooter({ text: 'Mickey Trap Academy' })
+                    .setTimestamp();
+
+                for (const [giveawayId, giveaway] of guildGiveaways) {
+                    const timeRemaining = giveaway.endsAt - Date.now();
+                    const status = giveaway.ended ? '✅ Ended' : `⏱️ ${formatDuration(timeRemaining)}`;
+                    
+                    listEmbed.addFields({
+                        name: `${giveaway.prize}`,
+                        value: `ID: \`${giveawayId}\`\nStatus: ${status}\nParticipants: ${giveaway.participants.length}\nWinners: ${giveaway.winners}`,
+                        inline: false
+                    });
+                }
+
+                await interaction.reply({ embeds: [listEmbed], flags: 64 });
+            } catch (error) {
+                console.error('Error in glist command:', error);
+                await interaction.reply({
+                    content: `❌ Error: ${error.message}`,
+                    flags: 64
+                });
+            }
+        }
+
+        if (commandName === 'gsettings') {
+            try {
+                const subcommand = interaction.options.getSubcommand();
+                const settings = loadGiveawaySettings();
+                const guildSettings = settings[interaction.guildId] || {
+                    color: '#FF00FF',
+                    emoji: '🎉'
+                };
+
+                if (subcommand === 'show') {
+                    const settingsEmbed = new EmbedBuilder()
+                        .setColor(guildSettings.color)
+                        .setTitle('⚙️ Giveaway Settings')
+                        .addFields(
+                            { name: 'Embed Color', value: guildSettings.color, inline: true },
+                            { name: 'Join Emoji', value: guildSettings.emoji, inline: true }
+                        )
+                        .setFooter({ text: 'Mickey Trap Academy' })
+                        .setTimestamp();
+
+                    return await interaction.reply({ embeds: [settingsEmbed], flags: 64 });
+                }
+
+                if (subcommand === 'set-color') {
+                    const color = interaction.options.getString('color');
+
+                    // Validate hex color
+                    if (!/^#[0-9A-F]{6}$/i.test(color)) {
+                        return await interaction.reply({
+                            content: '❌ Invalid hex color! Use format: #FF0000',
+                            flags: 64
+                        });
+                    }
+
+                    guildSettings.color = color;
+                    settings[interaction.guildId] = guildSettings;
+                    saveGiveawaySettings(settings);
+
+                    return await interaction.reply({
+                        content: `✅ Giveaway color changed to ${color}`,
+                        flags: 64
+                    });
+                }
+
+                if (subcommand === 'set-emoji') {
+                    const emoji = interaction.options.getString('emoji');
+
+                    guildSettings.emoji = emoji;
+                    settings[interaction.guildId] = guildSettings;
+                    saveGiveawaySettings(settings);
+
+                    return await interaction.reply({
+                        content: `✅ Giveaway emoji changed to ${emoji}`,
+                        flags: 64
+                    });
+                }
+            } catch (error) {
+                console.error('Error in gsettings command:', error);
+                await interaction.reply({
+                    content: `❌ Error: ${error.message}`,
+                    flags: 64
+                });
+            }
+        }
+
     }
 
     // Handle modal submissions
@@ -2527,6 +3094,97 @@ client.on('messageCreate', async (message) => {
         }
     } catch (error) {
         console.error('Error handling message:', error);
+    }
+});
+
+// Handle message reaction add (giveaway join)
+client.on('messageReactionAdd', async (reaction, user) => {
+    try {
+        if (user.bot) return; // Ignore bot reactions
+
+        // Fetch full reaction if partial
+        if (reaction.partial) {
+            await reaction.fetch();
+        }
+
+        const giveaways = loadGiveawayConfig();
+
+        // Check if this message is a giveaway
+        for (const [giveawayId, giveaway] of Object.entries(giveaways)) {
+            if (giveaway.messageId === reaction.message.id && giveaway.channelId === reaction.message.channelId) {
+                if (giveaway.ended) return;
+                if (reaction.emoji.name !== giveaway.emoji && reaction.emoji.toString() !== giveaway.emoji) return;
+
+                // Add participant if not already there
+                if (!giveaway.participants.includes(user.id)) {
+                    giveaway.participants.push(user.id);
+                    saveGiveawayConfig(giveaways);
+
+                    // Update participants count
+                    try {
+                        const message = await reaction.message.channel.messages.fetch(giveaway.messageId);
+                        const embed = message.embeds[0];
+                        const newEmbed = new EmbedBuilder(embed.data)
+                            .spliceFields(2, 1, {
+                                name: 'Participants',
+                                value: `${giveaway.participants.length}`,
+                                inline: true
+                            });
+                        await message.edit({ embeds: [newEmbed] });
+                    } catch (error) {
+                        console.error('Error updating participant count:', error);
+                    }
+                }
+                return;
+            }
+        }
+    } catch (error) {
+        console.error('Error handling reaction add:', error);
+    }
+});
+
+// Handle message reaction remove (giveaway leave)
+client.on('messageReactionRemove', async (reaction, user) => {
+    try {
+        if (user.bot) return;
+
+        if (reaction.partial) {
+            await reaction.fetch();
+        }
+
+        const giveaways = loadGiveawayConfig();
+
+        for (const [giveawayId, giveaway] of Object.entries(giveaways)) {
+            if (giveaway.messageId === reaction.message.id && giveaway.channelId === reaction.message.channelId) {
+                if (giveaway.ended) return;
+                if (reaction.emoji.name !== giveaway.emoji && reaction.emoji.toString() !== giveaway.emoji) return;
+
+                // Remove participant
+                const idx = giveaway.participants.indexOf(user.id);
+                if (idx > -1) {
+                    giveaway.participants.splice(idx, 1);
+                    saveGiveawayConfig(giveaways);
+
+                    // Update participants count
+                    try {
+                        const message = await reaction.message.channel.messages.fetch(giveaway.messageId);
+                        const embed = message.embeds[0];
+                        const newEmbed = new EmbedBuilder(embed.data)
+                            .spliceFields(2, 1, {
+                                name: 'Participants',
+                                value: `${giveaway.participants.length}`,
+                                inline: true
+                            });
+                        await message.edit({ embeds: [newEmbed] });
+                    } catch (error) {
+                        console.error('Error updating participant count:', error);
+                    }
+                }
+                return;
+            }
+        }
+    } catch (error) {
+        console.error('Error handling reaction remove:', error);
     }
 });
 
