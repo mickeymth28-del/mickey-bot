@@ -2114,10 +2114,9 @@ client.on('messageCreate', async (message) => {
                     // Delete message
                     await message.delete().catch(() => {});
                     
-                    // Send warning
+                    // Send warning (tanpa reply reference biar ga glitch)
                     await message.channel.send({
-                        content: `🚫 ${message.author}, pesan kamu berisi kata yang dilarang!`,
-                        reply: { messageReference: message.id }
+                        content: `🚫 ${message.author}, pesan kamu berisi kata yang dilarang!`
                     }).catch(() => {});
                     
                     return; // Stop processing after first banned word found
