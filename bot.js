@@ -2112,13 +2112,22 @@ client.on('messageCreate', async (message) => {
             for (const bannedWord of guildFilter) {
                 if (messageContent.includes(bannedWord)) {
                     console.log(`🚫 Banned word detected: "${bannedWord}" in message from ${message.author.tag}: "${message.content}"`);
+                    
+                    // Check if bot has permission to delete
+                    if (!message.channel.permissionsFor(client.user).has('MANAGE_MESSAGES')) {
+                        console.warn(`⚠️ Bot missing MANAGE_MESSAGES permission in ${message.channel.name}`);
+                        return;
+                    }
+                    
                     try {
                         // Delete message immediately
-                        const deleted = await message.delete();
-                        console.log(`✅ Message deleted successfully`);
+                        await message.delete();
+                        await new Promise(resolve => setTimeout(resolve, 100)); // Small delay to ensure sync
+                        console.log(`✅ Message deleted successfully from ${message.author.tag}`);
                         return;
                     } catch (error) {
                         console.error('❌ Error deleting banned word message:', error.message);
+                        console.error(`📍 Channel: ${message.channel.name}, Guild: ${message.guild.name}`);
                         return;
                     }
                 }
