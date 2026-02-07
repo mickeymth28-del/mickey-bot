@@ -2111,9 +2111,12 @@ client.on('messageCreate', async (message) => {
             
             for (const bannedWord of guildFilter) {
                 if (messageContent.includes(bannedWord)) {
-                    // Delete message only (no warning)
-                    await message.delete().catch(() => {});
-                    
+                    try {
+                        // Delete message with proper error handling
+                        await message.delete();
+                    } catch (error) {
+                        console.error('Error deleting banned word message:', error);
+                    }
                     return; // Stop processing after first banned word found
                 }
             }
